@@ -1,13 +1,11 @@
 package ru.digitalGovCert.library;
 
 import android.content.Context;
-import android.util.Log;
 
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.SecureRandom;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -19,7 +17,6 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 
 /**
@@ -27,7 +24,6 @@ import androidx.annotation.Nullable;
  */
 public final class CertManager
 {
-	final static String TAG = "CertManager";
 	private final @NonNull List<String> rawCertNames;
 
 	public CertManager()
@@ -42,27 +38,12 @@ public final class CertManager
 	 *
 	 * @param context {@link Context}.
 	 */
-	public final @Nullable CertData createCertData(final @Nullable Context context)
+	public final @NonNull CertData createCertData(final @NonNull Context context) throws Exception
 	{
-		if (context == null)
-		{
-			Log.d(TAG, "Error make certData – context is null");
-			return null;
-		}
+		final CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
 
-		final CertificateFactory certificateFactory = createCertificateFactory();
-		if (certificateFactory == null)
-		{
-			Log.d(TAG, "Error make certData – certificateFactory is null");
-			return null;
-		}
-
-		final KeyStore keyStore = createKeyStore();
-		if (keyStore == null)
-		{
-			Log.d(TAG, "Error make certData – keyStore is null");
-			return null;
-		}
+		final KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+		keyStore.load(null, null);
 
 		final CertLoader certLoader = new CertLoader(context, certificateFactory);
 		for (String rawCertName : rawCertNames)
@@ -94,73 +75,19 @@ public final class CertManager
 			}
 		}
 
-		final TrustManagerFactory trustManagerFactory = createTrustManagerFactory(keyStore);
-		if (trustManagerFactory == null)
-		{
-			Log.d(TAG, "Error make certData – trustManagerFactory is null");
-			return null;
-		}
+		final String tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm();
+		final TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(tmfAlgorithm);
+		trustManagerFactory.init(keyStore);
 
 		final X509TrustManager x509TrustManager = findX509TrustManager(trustManagerFactory);
-		if (x509TrustManager == null)
-		{
-			Log.d(TAG, "Error make certData – x509TrustManager is null");
-			return null;
-		}
+		final SSLContext sslContext = SSLContext.getInstance("SSL");
 
-		final SSLContext sslContext = createSslContext(trustManagerFactory);
-		if (sslContext == null)
-		{
-			Log.d(TAG, "Error make certData – sslContext is null");
-			return null;
-		}
+		sslContext.init(null, trustManagerFactory.getTrustManagers(), new SecureRandom());
+
 		return new CertData(x509TrustManager, sslContext, trustManagerFactory);
 	}
 
-	private final @Nullable CertificateFactory createCertificateFactory()
-	{
-		try
-		{
-			return CertificateFactory.getInstance("X.509");
-		}
-		catch (CertificateException e)
-		{
-			Log.d(TAG, "Error make certData – certificate factory is null");
-			return null;
-		}
-	}
-
-	private final @Nullable KeyStore createKeyStore()
-	{
-		try
-		{
-			final KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-			keyStore.load(null, null);
-			return keyStore;
-		}
-		catch (Throwable e)
-		{
-			return null;
-		}
-	}
-
-	private final @Nullable TrustManagerFactory createTrustManagerFactory(final @NonNull KeyStore keyStore)
-	{
-		final String tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm();
-		try
-		{
-			final TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(tmfAlgorithm);
-			trustManagerFactory.init(keyStore);
-			return trustManagerFactory;
-		}
-		catch (Throwable e)
-		{
-			e.printStackTrace();
-			return null;
-		}
-	}
-
-	private final @Nullable X509TrustManager findX509TrustManager(final @NonNull TrustManagerFactory trustManagerFactory)
+	private final @NonNull X509TrustManager findX509TrustManager(final @NonNull TrustManagerFactory trustManagerFactory) throws Exception
 	{
 
 		for (TrustManager trustManager : trustManagerFactory.getTrustManagers())
@@ -170,22 +97,7 @@ public final class CertManager
 				return (X509TrustManager) trustManager;
 			}
 		}
-		return null;
-	}
-
-
-	private final @Nullable SSLContext createSslContext(final @NonNull TrustManagerFactory trustManagerFactory)
-	{
-		try
-		{
-			final SSLContext sslContext = SSLContext.getInstance("SSL");
-			sslContext.init(null, trustManagerFactory.getTrustManagers(), new SecureRandom());
-			return sslContext;
-		}
-		catch (Throwable e)
-		{
-			return null;
-		}
+		throw new Exception("cannot find X509TrustManager in trustManagerFactory");
 	}
 }
 

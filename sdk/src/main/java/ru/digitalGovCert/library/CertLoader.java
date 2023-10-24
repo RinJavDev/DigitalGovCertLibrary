@@ -46,39 +46,34 @@ final class CertLoader
 		}
 	}
 
-	final @NonNull ArrayList<X509Certificate> getSystemCerts()
+	final @NonNull ArrayList<X509Certificate> getSystemCerts() throws Exception
 	{
 		final ArrayList<X509Certificate> certificates = new ArrayList<>();
-		try
+
+		final KeyStore ks = KeyStore.getInstance("AndroidCAStore");
+
+		if (ks != null)
 		{
-			final KeyStore ks = KeyStore.getInstance("AndroidCAStore");
+			ks.load(null, null);
+			final Enumeration<String> aliases = ks.aliases();
 
-			if (ks != null)
+			while (aliases.hasMoreElements())
 			{
-				ks.load(null, null);
-				final Enumeration<String> aliases = ks.aliases();
-
-				while (aliases.hasMoreElements())
+				try
 				{
-					try
-					{
 
-						final String alias = aliases.nextElement();
-						final X509Certificate cert = (X509Certificate) ks.getCertificate(alias);
+					final String alias = aliases.nextElement();
+					final X509Certificate cert = (X509Certificate) ks.getCertificate(alias);
 
-						certificates.add(cert);
-					}
-					catch (Throwable throwable)
-					{
-						throwable.printStackTrace();
-					}
+					certificates.add(cert);
+				}
+				catch (Throwable throwable)
+				{
+					throwable.printStackTrace();
 				}
 			}
 		}
-		catch (Throwable e)
-		{
-			e.printStackTrace();
-		}
+
 		return certificates;
 	}
 
